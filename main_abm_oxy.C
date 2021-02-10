@@ -1,0 +1,221 @@
+#include "general_libraries.h"
+#include "cell_abm.h"
+#include "main_abm_oxy.h"
+
+//###########################################################################
+//                    0 - Dead Cells
+//                    1 - Tumor Cells
+//                    2 - Proliferative Tumor Cells
+//                    3 - Hypoxic Tumor Cells
+//                    4 - Dying Tumor Cells
+//                    5 - G1 Tumor Cells
+//                    6 - Normoxic Cells
+//###########################################################################
+
+Number exact_value_ox(const Point& ,const Parameters& parameters,const std::string& ,const std::string& )
+{
+  // This value should reflect the concentration of glucose in the domain
+  return parameters.get<Real>("nutrient_ic");
+}
+
+double triangle_area(const Point& e1,const Point& e2,const Point& e3)
+{
+  return 0.5*fabs((e1(0)-e3(0))*(e2(1)-e1(1))-(e1(0)-e2(0))*(e3(1)-e1(1)));
+}
+
+double scalar_prod(const Point& e1,const Point& e2)
+{
+  return e1(0)*e2(0)+e1(1)*e2(1);
+}
+
+void main_code(LibMeshInit &init, vector<double>& LIVE_CONFL, vector<double>& DEAD_CONFL, vector<double> Parameters, const unsigned int rand_seed)
+{
+
+  list <Cell> Cells_local;
+  
+  //********** Read arguments **********
+  //Read parameters from options file; if not in file, values are assigned to default values shown in next ~25ish lines
+  GetPot input_file("options.in");
+  const unsigned int n_timesteps = input_file("n_timesteps",100);
+  const unsigned int file_number = input_file("file_number",1);
+  const unsigned int initial_tum = input_file("initial_tum",20);
+  const unsigned int print_inter = input_file("print_inter",100);
+  const unsigned int ic_type     = input_file("ic_type",1);
+  const unsigned int max_outside = input_file("max_outside",1500);
+  const std::string mesh_name    = input_file("mesh_name", "circle.msh");
+  const unsigned int read_mesh   = input_file("read_mesh",0);
+  const unsigned int verbose     = input_file("verbose",0);
+  const unsigned int print_sa    = input_file("print_sa",0);
+  const double cluster_scale     = input_file("cluster_scale",1.0);
+  const double con_b             = input_file("con_b",1.0);
+  const double con_n             = input_file("con_n",1.0);
+  const double domain_diameter   = input_file("domain_diameter",1.0);
+  const double time_step         = input_file("time_step",0.05);
+  const double nucleus_radius    = input_file("nucleus_radius",5.295);
+  const double cell_radius       = input_file("cell_radius",9.953);
+  const double action_prop       = input_file("action_prop",1.214);
+  const double c_ccr             = input_file("c_ccr",10.0);
+  const double c_tta             = input_file("c_tta",0.488836);
+  const double c_hha             = input_file("c_hha",0.588836);
+  const int max_outside_signed   = input_file("max_outside",1500);
+  
+  //Seed the RNG for stochastic processes
+  Ran ran(rand_seed);
+  int outside_cells = 0;
+  int total_tumor = initial_tum;
+  char buffer[30];
+  
+  //Declare output file to store cell data in
+  ofstream out_data;
+  if(verbose || print_sa){
+    char bufferf[30];
+    sprintf(bufferf, "cells_data%d.txt",rand_seed);
+    out_data.open(bufferf);
+  }
+  
+  //********** Create a uniform mesh **********
+  SerialMesh mesh(init.comm());
+  MeshTools::Generation::build_cube (mesh,
+                                     20,
+                                     20,
+                                     0,
+                                     0., domain_diameter,
+                                     0., domain_diameter,
+                                     0., 0.,
+                                     QUAD4);
+  //********** Create an equation systems object and set a simulation-specific parameter **********
+  EquationSystems equation_systems(mesh);
+  equation_systems.parameters.set<Real> ("prol_intes")          = Parameters[0];
+  equation_systems.parameters.set<Real> ("apop_intes")          = Parameters[1];
+  equation_systems.parameters.set<Real> ("nut_d")               = Parameters[2];
+  equation_systems.parameters.set<Real> ("con_t")               = Parameters[3];
+  equation_systems.parameters.set<Real> ("initial_con_live")    = Parameters[4]; // Must be decimal
+  equation_systems.parameters.set<Real> ("initial_con_dead")    = Parameters[5]; // Must be decimal
+  equation_systems.parameters.set<Real> ("proliferative_ratio") = Parameters[6];
+  equation_systems.parameters.set<Real> ("apop_time")           = Parameters[7];  
+  equation_systems.parameters.set<Real> ("gamma_A")             = Parameters[8];
+  equation_systems.parameters.set<Real> ("gamma_P")             = Parameters[9];
+  equation_systems.parameters.set<Real> ("hypoxic_thrs")        = Parameters[10];
+  equation_systems.parameters.set<Real> ("nutrient_ic")         = input_file("ntri_ic",1.0); // Nutrient initial condition
+  equation_systems.parameters.set<Real> ("con_b")               = con_b;
+  equation_systems.parameters.set<Real> ("con_n")               = con_n;
+  equation_systems.parameters.set<Real> ("time_step_size")      = time_step;
+  equation_systems.parameters.set<int>  ("initial_tumor")       = total_tumor;
+  equation_systems.parameters.set<int>  ("ic_type")             = ic_type;
+  equation_systems.parameters.set<Real> ("nucleus_radius")      = cluster_scale*nucleus_radius;
+  equation_systems.parameters.set<Real> ("cell_radius")         = cluster_scale*cell_radius;
+  equation_systems.parameters.set<Real> ("action_radius")       = action_prop*cell_radius*cluster_scale;
+  equation_systems.parameters.set<Real> ("g1_time")             = 9.0;
+  equation_systems.parameters.set<Real> ("lysing_time")         = 6.0;
+  equation_systems.parameters.set<Real> ("calc_time")           = 360.0;
+  equation_systems.parameters.set<Real> ("cellc_time")          = 18.0;
+  equation_systems.parameters.set<Real> ("delta_tt")            = 1.0;
+  equation_systems.parameters.set<Real> ("f_NS")                = 1.0;
+  equation_systems.parameters.set<Real> ("lambda_cell")         = 0.1;
+  equation_systems.parameters.set<Real> ("domain_diameter")     = domain_diameter;
+  equation_systems.parameters.set<Real> ("max_out_cells")       = max_outside;
+  equation_systems.parameters.set<Real> ("c_ccr")               = c_ccr;
+  equation_systems.parameters.set<Real> ("c_tta")               = c_tta;
+  equation_systems.parameters.set<Real> ("c_hha")               = c_hha;
+  equation_systems.parameters.set<int> ("max_outside")          = max_outside_signed;
+  equation_systems.parameters.set<list<Cell>*> ("l_cells")      = &Cells_local;
+
+  //********** Initial conditions for cells **********
+  init_cond_cells(Cells_local, equation_systems.parameters, ran);
+  total_tumor = Cells_local.size();
+  
+  //********** Initialize the data structures for the equation system **********
+  double confluence = 0.;
+  double dead_conf = 0.;
+  int num_dead = 0;
+  int qtd_c4,qtd_c1,qtd_cp;
+  qtd_c4 = qtd_c1 = qtd_cp = 0;
+  std::list<Cell>::iterator cg;
+  for(cg = Cells_local.begin(); cg != Cells_local.end(); cg++){
+    if((*cg).state==4){
+	  dead_conf += std::pow((*cg).C_radius, 2) / std::pow(0.5 * domain_diameter, 2);
+	  qtd_c4++;
+    }
+    else if((*cg).state==1){
+	  confluence += std::pow((*cg).C_radius, 2) / std::pow(0.5 * domain_diameter, 2);
+	  qtd_c1++;
+    }
+    else{
+	  confluence += std::pow((*cg).C_radius, 2) / std::pow(0.5 * domain_diameter, 2);
+	  qtd_cp++;
+    }
+  }
+  num_dead = qtd_c4;
+  if(confluence+dead_conf>1){
+    double val = confluence+dead_conf;
+    confluence=confluence/val;
+    dead_conf = dead_conf/val;
+  }
+  LIVE_CONFL.push_back(confluence);
+  DEAD_CONFL.push_back(dead_conf);
+  if(verbose)
+    save_cells(Cells_local,domain_diameter,"saida",rand_seed,0);
+  if(verbose || print_sa)
+    out_data << 0.0 << " " << confluence << " " << dead_conf << " " << qtd_c1 << " " << qtd_cp << " " << qtd_c4 << endl;
+    
+  //********** Loop over time **********
+  unsigned int t_step = 0;
+  
+  do{
+    //********** Increase time_step counter **********
+    t_step++;
+
+    //********** Solve ABM system **********
+    update_states(Cells_local, t_step, ran, equation_systems, outside_cells, total_tumor, num_dead);
+    compute_forces(Cells_local, equation_systems, domain_diameter, outside_cells, total_tumor);
+
+    // Confluence
+    confluence = 0.;
+    dead_conf = 0.;
+    qtd_c4 = qtd_c1 = qtd_cp = 0;
+    for(cg = Cells_local.begin(); cg != Cells_local.end(); cg++){
+	  if((*cg).state==4){
+	    dead_conf += std::pow((*cg).C_radius, 2) / std::pow(0.5 * domain_diameter, 2);
+	    qtd_c4++;
+	  }
+	  else if((*cg).state==1){
+	    confluence += std::pow((*cg).C_radius, 2) / std::pow(0.5 * domain_diameter, 2);
+	    qtd_c1++;
+ 	  }
+	  else{
+	    confluence += std::pow((*cg).C_radius, 2) / std::pow(0.5 * domain_diameter, 2);
+	    qtd_cp++;
+	  }
+    }
+    if(confluence+dead_conf>1){
+      double val = confluence+dead_conf;
+      confluence=confluence/val;
+      dead_conf = dead_conf/val;
+    }
+    // Output live confluence info if verbose
+    if(verbose){
+	  if(t_step%print_inter==0)
+	    save_cells(Cells_local,domain_diameter,"saida",rand_seed,t_step);
+	  cout << "**************************************************" << endl;
+  	  cout << "T Confluence    = " << confluence + dead_conf << endl;
+	  cout << "L Confluence    = " << confluence << endl;
+	  cout << "D Confluence    = " << dead_conf << endl;
+	  cout << "Number of cells = " << Cells_local.size() << endl;
+	  cout << "Tumor cells     = " << total_tumor << endl;
+	  cout << "Outside cells   = " << outside_cells << endl;
+	  cout << "Time iteration  = " << t_step << endl;
+	  cout << "Time            = " << t_step*time_step << endl;
+	  cout << "**************************************************" << endl;
+    }
+    if(verbose || print_sa)
+      out_data << t_step << " " << confluence << " " << dead_conf << " " << qtd_c1 << " " << qtd_cp << " " << qtd_c4 << endl;
+    if(t_step%3==0){
+	  LIVE_CONFL.push_back(confluence);
+	  DEAD_CONFL.push_back(dead_conf);
+    }
+  }while(t_step<n_timesteps);
+  if(verbose)
+    save_cells(Cells_local, domain_diameter, "saida", rand_seed, t_step);
+  if(verbose || print_sa)
+    out_data.close();
+}
