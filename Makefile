@@ -18,7 +18,7 @@ COMP_OPTIONS = -DNDEBUG -g -Wall
 include $(LIBMESH_DIR)/Make.common
 
 # executable name
-target     := ./models_ode_sifp
+target     := ./forward.out
 
 #================================================================================
 # File management.
