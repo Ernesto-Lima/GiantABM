@@ -29,7 +29,9 @@ void potential_rep(double& psi_x, double& psi_y, double r_x, double r_y, double 
 
 void normal(double& N_x, double& N_y, double x_cel, double y_cel, double height);
 
-void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, double height, int& outside_cells, int& total_tumor);
+void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, double height, int& outside_cells, int& total_tumor, Ran & ran);
+
+void compute_initial_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, double height, int& outside_cells, int& total_tumor);
 
 void update_states(list<Cell> & Cells_local, int time, Ran & ran, EquationSystems& equation_systems, const int outside_cells, int & total_tumor, int & num_dead);
 

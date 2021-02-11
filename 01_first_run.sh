@@ -4,32 +4,24 @@ scale=16
 #################### Create Options File ######################
 input_file=options.in
 cat << EOF > ${input_file}
-mesh_name = circle_6384_lc400.msh
-read_mesh = 1
-ic_type = 27
 initial_tum = 3
-n_timesteps = 96
-print_inter = 3
+n_timesteps = 300
+print_inter = 30
 verbose = 1
 print_sa = 1
 domain_diameter = 6384
 cluster_scale = ${scale}
-con_b = 0.001
-con_n = 0.001
 time_step = 1.0
 c_ccr = 10.0
 c_tta = 0.488836
 c_hha = 0.588836
-max_outside = 2000
 rand_seed = 5
 prol_intens = 0.52
-file_number = 1
 k_var = 1
 k_val = 0.1
 nucleus_radius = 5.295
 cell_radius = 9.953
 action_prop = 1.214
-ntri_ic = 0.5
 EOF
 #################### Create Python Mean Var Code ##############
 python_file=mean_std.py
@@ -50,17 +42,11 @@ loop=1
 echo "Realizations to add = ${loop}"
 parameters_file=parameters.in
 cat << EOF > ${parameters_file}
-alpha_p = 4.9e-02
+alpha_p = 5.9e-02
 alpha_a = 4.1e-04
-nu_diff = 50.0
-n_lambd = 4.8e-02
-live_ic = 0.5
-dead_ic = 0.3
-rate_pc = 0.0
-t_death = 97.0
-gamma_a = 2.4e-02
-gamma_p = 50.0
-sigma_h = 5.4e-02
+live_ic = 0.6
+dead_ic = 0.0
+t_death = 10.0
 size_loop = ${loop}
 EOF
 #vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -78,7 +64,10 @@ fi
 number=$(more $FILE | wc -l | awk '{printf "%05d\n",$1+0}')
 echo $number
 pvpython mean_std.py
+lend=$(wc -l < out_py.txt | awk '{printf "%d\n",$1/2}')
 echo 
-sed -n -e "1,33p" out_py.txt > live_${number}.dat
-sed -n -e "34,66p" out_py.txt > dead_${number}.dat
-rm *# *~ tmp.csv out_py.txt &> /dev/null
+sed -n -e "1,${lend}p" out_py.txt > live_${number}.dat
+let lbgn=lend+1
+lend=$(wc -l < out_py.txt | awk '{printf "%d\n",$1+0}')
+sed -n -e "${lbgn},${lend}p" out_py.txt > dead_${number}.dat
+#rm *# *~ tmp.csv out_py.txt &> /dev/null

@@ -22,22 +22,22 @@ for file in dead*.dat; do
     echo "set border linewidth 3" >> figura.cmd
     echo "set ytics nomirror" >> figura.cmd
     echo "set key ins vert reverse top Left left font ',${font}'" >> figura.cmd
-    echo "set ylabel 'Confluence (Dead)' font ',${font}'" >> figura.cmd
-    echo "set y2label 'Confluence (Live)' font ',${font}'" >> figura.cmd
+    #echo "set ylabel 'Confluence (Dead)' font ',${font}'" >> figura.cmd
+    echo "set ylabel 'Confluence' font ',${font}'" >> figura.cmd
     echo "set xlabel 'Time (hours)' font ',${font}'" >> figura.cmd
-    echo "set ytics font ',${font}'" >> figura.cmd
-    echo "set xtics 12 font ',${font}'" >> figura.cmd
-    echo "set y2tics font ',${font}'" >> figura.cmd
+    echo "set ytics 0.2 font ',${font}'" >> figura.cmd
+    echo "set xtics 10 font ',${font}'" >> figura.cmd
+#    echo "set y2tics font ',${font}'" >> figura.cmd
     let fcap=font-5
     echo "set title '${samples} samples' offset 0,-0.75 font ',${fcap}'" >> figura.cmd
-    echo -n "plot [-2:98][] " >> figura.cmd
+    echo -n "plot [-2:102][-0.1:1.1] " >> figura.cmd
     if [ ${std} = 'nan' ]
     then
-        echo -n "'${file}' u (\$0*3):1 axis x1y1 t'Dead' with p pt 7 ps 0.3 lc 'red'," | tee -a figura.cmd &> /dev/null
-        echo -n "'live_${samples}.dat' u (\$0*3):1 axis x1y2 t'Live' with p pt 7 ps 0.3 lc 'blue'," | tee -a figura.cmd &> /dev/null
+        #echo -n "'${file}' u (\$0*3):1 axis x1y1 t'Dead' with p pt 7 ps 0.3 lc 'red'," | tee -a figura.cmd &> /dev/null
+        echo -n "'live_${samples}.dat' u (\$0*3):1 axis x1y1 t'' with p pt 7 ps 0.3 lc 'blue'," | tee -a figura.cmd &> /dev/null
     else
-        echo -n "'${file}' u (\$0*3):1:2 axis x1y1 t'Dead' with yerrorbars pt 7 ps 0.3 lc 'red'," | tee -a figura.cmd &> /dev/null
-        echo -n "'live_${samples}.dat' u (\$0*3):1:2 axis x1y2 t'Live' with yerrorbars pt 7 ps 0.3 lc 'blue'," | tee -a figura.cmd &> /dev/null
+        #echo -n "'${file}' u (\$0*3):1:2 axis x1y1 t'Dead' with yerrorbars pt 7 ps 0.3 lc 'red'," | tee -a figura.cmd &> /dev/null
+        echo -n "'live_${samples}.dat' u (\$0*3):1:2 axis x1y1 t'' with yerrorbars pt 7 ps 0.3 lc 'blue'," | tee -a figura.cmd &> /dev/null
     fi
     gnuplot "figura.cmd"
     pdfcrop ${name}.pdf ${name}t.pdf &> /dev/null

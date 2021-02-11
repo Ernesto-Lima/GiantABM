@@ -46,11 +46,11 @@ echo "axis square;" >> circle_cell.m
 #--------------- Endothelial cells ----------------
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 echo "elseif t == 7" >> circle_cell.m
-echo "h=fill(X,Y,'r','LineWidth',0.01);" >> circle_cell.m
+echo "h=fill(X,Y,[0.0 0.0 0.0],'LineWidth',0.01);" >> circle_cell.m
 echo "set(h,'facealpha',.75);" >> circle_cell.m
 echo "axis square;" >> circle_cell.m
 echo "elseif t == 8" >> circle_cell.m
-echo "h=fill(X,Y,[0 0.5 0],'LineWidth',0.01);" >> circle_cell.m
+echo "h=fill(X,Y,[1.0 0.0 1.0],'LineWidth',0.01);" >> circle_cell.m
 echo "set(h,'facealpha',.75);" >> circle_cell.m
 echo "axis square;" >> circle_cell.m
 echo "elseif t == 9" >> circle_cell.m

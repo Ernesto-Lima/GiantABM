@@ -13,6 +13,9 @@
 
 inline double max(double A, double B){return A > B ? A : B;}
 
+inline double area_c(double R){return M_PI*std::pow(R,2.0);}
+inline double radius_c(double A){return std::sqrt(A/M_PI);}
+
 double point_distance(const Point& A,const Point& B){ return sqrt(pow(A(0)-B(0),2)+pow(A(1)-B(1),2));}
 
 void update_states(list<Cell> & Cells_local, int time, Ran & ran, EquationSystems & equation_systems, const int outside_cells, int & total_tumor, int & num_dead)
@@ -29,10 +32,10 @@ void update_states(list<Cell> & Cells_local, int time, Ran & ran, EquationSystem
   const Real alfa_a_barra = equation_systems.parameters.get<Real>("apop_intes");
   //const Real tau_NL       = equation_systems.parameters.get<Real>("lysing_time");
   //const Real f_NS         = equation_systems.parameters.get<Real>("f_NS");
-  const Real sigma_h      = equation_systems.parameters.get<Real>("hypoxic_thrs");
+  //const Real sigma_h      = equation_systems.parameters.get<Real>("hypoxic_thrs");
   const double height     = equation_systems.parameters.get<Real>("domain_diameter");
-  const Real gamma_A      = equation_systems.parameters.get<Real>("gamma_A");
-  const Real gamma_P      = equation_systems.parameters.get<Real>("gamma_P");
+  //const Real gamma_A      = equation_systems.parameters.get<Real>("gamma_A");
+  //const Real gamma_P      = equation_systems.parameters.get<Real>("gamma_P");
    
   //********** Perform updates on all cells **********
   std::list<Cell>::iterator it;
@@ -41,18 +44,18 @@ void update_states(list<Cell> & Cells_local, int time, Ran & ran, EquationSystem
     double tau = time - (*it).time;
     // ********** Tumor cells **********
     if((*it).state == 1){
-      // ********** Compute nutrient concentration **********
-      double sigma_cel = 1.0;
       // Base parameter calculation
-      double alfa_p = max(alfa_p_barra * ( (sigma_cel - sigma_h) / (1.0 - sigma_h)),0.0);
-      double alfa_a = max(alfa_a_barra + gamma_A/(1.0+exp(-2.0*gamma_P*(sigma_h-sigma_cel))),0.0);
-	  double prob_mit = (1.0-exp(-delta_tt*alfa_p))/2.0;
+      double alfa_p = alfa_p_barra;
+      double alfa_a = alfa_a_barra;
+      double max_speed = euclid_norm((*it).v[0], (*it).v[1]);
+	  double prob_mit = exp(-100.0*max_speed)*((1.0-exp(-delta_tt*alfa_p))/2.0);
 	  double prob_apo = (1.0-exp(-delta_tt*alfa_a))/2.0;
 	  double rand_num = ran.doub();
+	  
 	  if(rand_num >= 0.5){
 	    // ********** Mitosis **********
 	    if(prob_mit >= ran.doub()){
-	      (*it).time = time;
+          (*it).time = time;
 	      (*it).prev_state = (*it).state;
 	      (*it).state = 2;
 	    }
@@ -113,6 +116,14 @@ void update_states(list<Cell> & Cells_local, int time, Ran & ran, EquationSystem
 	    //(*it).N_radius -= (*it).N_radius/(tau_A-tau+1);
 	  }
 	}
+	else if((*it).state == 7){
+	  it++;
+	}
+	else if((*it).state == 8){
+	  (*it).time = (*it).time - 1;
+	  if((*it).time==0) it = Cells_local.erase(it);
+	  else it++;
+	}
   }
 }
 
@@ -156,7 +167,224 @@ void normal(double& N_x,double& N_y,double x_cel,double y_cel,double height){
     }
 }
 
-void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, double height, int& outside_cells, int& total_tumor)
+void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, double height, int& outside_cells, int& total_tumor, Ran & ran)
+{
+  // ********** Parameters **********
+  const double c_ccr             = equation_systems.parameters.get<Real>("c_ccr");
+  const double c_tta             = equation_systems.parameters.get<Real>("c_tta");
+  const double c_hha             = equation_systems.parameters.get<Real>("c_hha");
+  const double max_c_radius      = equation_systems.parameters.get<Real>("cell_radius");
+  const double action_prop       = equation_systems.parameters.get<Real>("action_prop");
+  const double h_bin             = 3.0*max_c_radius;
+  const unsigned int number_bins = ceil(height/h_bin);
+  const unsigned int total_bins  = number_bins*number_bins;
+  double iter                    = 0.0;
+  const double delta_tt_max      = 60.0;
+  double v_max;
+  bool move_all = false;
+  vector< list <Cell *>> Cell_Bins(total_bins);
+  // ********** Loop **********
+  while (iter < delta_tt_max){
+    std::vector< list <Cell *>>(total_bins).swap(Cell_Bins);
+    int n =1; int m = 1; double M = 1;
+    double phi_x, phi_y, psi_x, psi_y;
+    // ********** Generate bins **********
+    std::list<Cell>::iterator it;
+    it = Cells_local.begin();
+    while(it != Cells_local.end()){
+	  unsigned int ix = floor((*it).x/h_bin);
+	  unsigned int jy = floor((*it).y/h_bin);
+	  unsigned int xy = ix+jy*number_bins;
+	  (*it).F[0] = 0.0;
+	  (*it).F[1] = 0.0;
+	  if(ix<0 || jy<0 ||jy>=number_bins || ix>=number_bins || xy >=total_bins){
+        cout << "Error" << endl;
+	    cout << "Cell = ( " << (*it).x << " , " << (*it).y << " ) = ( " << ix << " , " << jy << " ) = " << xy << endl;
+	    cout << "State = " << (*it).state << endl;
+	    cout << "total_bins  = " << total_bins << endl;
+	    cout << "number_bins = " << number_bins << endl;
+	    cout << "h_bin       = " << h_bin << endl;
+	    it = Cells_local.erase(it);
+	  }
+	  else{
+	    Cell_Bins[xy].push_back(&*it);
+	    it++;
+	  }
+	}
+    // ********** Cell-cell force **********
+    for(unsigned int bin_i = 0; bin_i < Cell_Bins.size(); bin_i++){
+	  std::list<Cell*>::iterator cell_a;
+	  for(cell_a = Cell_Bins[bin_i].begin(); cell_a != Cell_Bins[bin_i].end(); ++cell_a){
+        unsigned int jy = floor(bin_i/number_bins);
+	    unsigned int ix = bin_i%number_bins;
+	    unsigned int bin_j;
+	    vector<int> xxx{-1,0,0,1,1};
+	    vector<int> yyy{1,0,1,0,1};
+	    for(unsigned int p=0; p<xxx.size(); p++){
+	      if(ix+xxx[p]<number_bins && ix+xxx[p]>=0 && jy+yyy[p]<number_bins && jy+yyy[p]>=0){
+	        bin_j = (ix+xxx[p])+(jy+yyy[p])*number_bins;
+	        std::list<Cell *>::iterator cell_b;
+	        if(bin_i == bin_j){
+	          cell_b = cell_a;
+	          cell_b++;
+	        }
+	        else
+	          cell_b = Cell_Bins[bin_j].begin();
+            while(cell_b != Cell_Bins[bin_j].end()){
+              double F_cca_i[2] = {0.0,0.0}, F_ccr_i[2] = {0.0,0.0};
+	          double r_x = (*(*cell_b)).x - (*(*cell_a)).x;
+	    	  double r_y = (*(*cell_b)).y - (*(*cell_a)).y;
+	    	  double R_A = (*(*cell_b)).A_radius + (*(*cell_a)).A_radius;
+    	      double R_N = (*(*cell_b)).N_radius + (*(*cell_a)).N_radius;
+	    	  double R   = (*(*cell_b)).C_radius + (*(*cell_a)).C_radius;
+	    	  potential_adh(phi_x,phi_y,r_x,r_y,R_A,n);
+        	  potential_rep(psi_x,psi_y,r_x,r_y,R_N,R,M,m);
+	          double c_cca;
+	          if((*(*cell_a)).state != 6 && (*(*cell_b)).state != 6)
+	            c_cca = c_tta;
+    	      else
+	            c_cca = c_hha;
+	          F_cca_i[0] += -c_cca*phi_x;
+	          F_cca_i[1] += -c_cca*phi_y;
+	          F_ccr_i[0] += -c_ccr*psi_x;
+	          F_ccr_i[1] += -c_ccr*psi_y;
+	          (*(*cell_a)).F[0] += (F_cca_i[0] + F_ccr_i[0]);
+	          (*(*cell_a)).F[1] += (F_cca_i[1] + F_ccr_i[1]);
+	          (*(*cell_b)).F[0] -= (F_cca_i[0] + F_ccr_i[0]);
+	          (*(*cell_b)).F[1] -= (F_cca_i[1] + F_ccr_i[1]);
+              cell_b++;
+            }
+	      }
+	    }
+	    // ********** Cell-boundary force **********
+	    double F_ct[2] = {0.0, 0.0}, F_rct[2] = {0.0, 0.0};
+	    double N_x, N_y; 
+	    double K = (double) 10.0;
+	    double c_ct = 10.0 * K;
+	    double c_rct = 4.88836 * K;
+	    normal(N_x, N_y, (*(*cell_a)).x, (*(*cell_a)).y, height);
+	    potential_adh(phi_x, phi_y, N_x, N_y, (*(*cell_a)).A_radius, n);
+	    potential_rep(psi_x, psi_y, N_x, N_y, (*(*cell_a)).N_radius, (*(*cell_a)).C_radius, M, m);
+	    F_ct[0] = -c_ct*phi_x;
+	    F_ct[1] = -c_ct*phi_y;
+	    F_rct[0] = -c_rct*psi_x;
+	    F_rct[1] = -c_rct*psi_y;
+	    (*(*cell_a)).F[0] += (F_ct[0] + F_rct[0]);
+	    (*(*cell_a)).F[1] += (F_ct[1] + F_rct[1]);  
+	  }
+	}
+    // ********** Compute cell speed **********
+    v_max  = 0.0;
+    double v_mean = 0.;
+    double v_std  = 0.;
+    double * speeds = new double [Cells_local.size()];
+    unsigned int k = 0;
+    for(it = Cells_local.begin(); it != Cells_local.end(); it++){
+	  (*it).v[0] = -0.5*((*it).F[0]);
+	  (*it).v[1] = -0.5*((*it).F[1]);
+	  double max_speed = euclid_norm((*it).v[0], (*it).v[1]);
+	  if(max_speed >= v_max)
+	    v_max = max_speed;
+	  speeds[k] = max_speed;
+	  k++;
+	  v_mean += max_speed;
+	}
+    v_mean = v_mean / Cells_local.size();
+    k = 0;
+    for (k = 0; k < Cells_local.size(); k++)
+	  v_std += (speeds[k] - v_mean) * (speeds[k] - v_mean);
+    delete[] speeds;
+    v_std = sqrt(v_std / (Cells_local.size() - 1));
+    // If standard deviation is low enough, take larger delta_tt value
+    // This is because a low standard deviation value for velocity implies cells are in equilibrium    
+    double delta_tt;
+    double std_thresh = 0.001;
+    if (v_std < std_thresh && v_max < 0.2){
+	  if(v_std == 0)
+	    delta_tt = delta_tt_max;
+	  else
+	    delta_tt = (1.0/v_max) * (1. + std_thresh / v_std);
+    }
+    else
+	  delta_tt = (1.0/v_max);
+    if(delta_tt>delta_tt_max)
+	  delta_tt = delta_tt_max;
+    
+    // ********** Update cell position **********
+    it = Cells_local.begin();
+    while(it != Cells_local.end()){
+	  (*it).x += delta_tt * (*it).v[0];
+	  (*it).y += delta_tt * (*it).v[1];
+	  //(*it).F[0] = 0.0;
+	  //(*it).F[1] = 0.0;
+	  double dist = distance((*it), height/2.0, height/2.0);
+	  if(dist >= height/2.0){
+	    it = Cells_local.erase(it);
+	    outside_cells++;
+	  }
+	  else
+	    it++;
+	}
+    iter += delta_tt;
+  }
+  cout << v_max << endl;
+  if(v_max > 0.4){
+    std::list<Cell>::iterator it;
+    for(it = Cells_local.begin(); it != Cells_local.end(); it++){
+      if((*it).state == 1 || (*it).state == 2){	    
+	    double max_speed = euclid_norm((*it).v[0], (*it).v[1]);
+	    //cout << "max_speed = " << max_speed << endl; 
+	    if(max_speed >= 0.4 && 0.37 > ran.doub()){
+	      move_all = true;
+	      cout << "Changed: " << (*it).state << endl;
+	      (*it).prev_state = (*it).state;
+	      (*it).state = 8;
+	      (*it).time = 2;
+	      unsigned int ix = floor((*it).x/h_bin);
+	      unsigned int jy = floor((*it).y/h_bin);
+	      unsigned int xy = ix+jy*number_bins;
+	      cout << "Bin:" << xy << endl;
+	      for(int i = -1; i<=1; i++){
+  	        for(int j = -1; j<=1; j++){
+    	      int nix = ix + i;
+    	      int njy = jy + j;
+  	          unsigned int nxy = nix+njy*number_bins;
+	          if( !(nix<0 || njy<0 ||njy>=int(number_bins) || nix>=int(number_bins) || nxy >=total_bins) ){
+	            std::list<Cell*>::iterator cell_a;
+	            for(cell_a = Cell_Bins[nxy].begin(); cell_a != Cell_Bins[nxy].end(); ++cell_a){
+	              if( ((*(*cell_a)).state == 1 || (*(*cell_a)).state == 2) && ran.doub() > 0.5){
+	                (*(*cell_a)).prev_state = (*(*cell_a)).state;
+	                (*(*cell_a)).state = 7;
+	                //cout << "Cell" << endl;
+	                (*it).C_radius = radius_c(
+	                                          area_c((*(*cell_a)).C_radius)
+	                                          +area_c((*it).C_radius)
+	                                          );
+	                (*it).N_radius = radius_c(
+	                                          area_c((*(*cell_a)).N_radius)
+	                                          +area_c((*it).N_radius)
+	                                          );
+	                (*it).A_radius = (*it).C_radius*action_prop;               
+	              }
+	            }
+	          }
+	        }
+	      }	      
+	      //getchar();
+	    }
+	  }
+	}
+  }
+  std::list<Cell>::iterator it = Cells_local.begin();
+  while(it != Cells_local.end()){
+    if((*it).state ==7) it = Cells_local.erase(it);
+    else it++;
+  }
+  if(move_all)
+    compute_initial_forces(Cells_local,equation_systems,height, outside_cells,total_tumor);
+}
+
+void compute_initial_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, double height, int& outside_cells, int& total_tumor)
 {
   // ********** Parameters **********
   const double c_ccr             = equation_systems.parameters.get<Real>("c_ccr");
@@ -167,7 +395,8 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
   const unsigned int number_bins = ceil(height/h_bin);
   const unsigned int total_bins  = number_bins*number_bins;
   double iter                    = 0.0;
-  const double delta_tt_max      = 60.0;
+  const double delta_tt_max      = 1000.0;
+  double v_max;
   // ********** Loop **********
   while (iter < delta_tt_max){
     int n =1; int m = 1; double M = 1;
@@ -257,7 +486,7 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
 	  }
 	}
     // ********** Compute cell speed **********
-    double v_max  = 5.0e-3;
+    v_max  = 5.0e-3;
     double v_mean = 0.;
     double v_std  = 0.;
     double * speeds = new double [Cells_local.size()];
@@ -282,7 +511,7 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
     // This is because a low standard deviation value for velocity implies cells are in equilibrium    
     double delta_tt;
     double std_thresh = 0.001;
-    if (v_std < std_thresh){
+    if (v_std < std_thresh && v_max < 0.2){
 	  if(v_std == 0)
 	    delta_tt = delta_tt_max;
 	  else
@@ -429,13 +658,10 @@ void init_cond_cells(list<Cell>& Cells_local, const Parameters& all_parameters, 
   const Real initial_con_dead    = all_parameters.get<Real>("initial_con_dead");
   const Real tau_P               = all_parameters.get<Real>("cellc_time");
   const Real tau_g1              = all_parameters.get<Real>("g1_time");
-  const double nut_ic            = all_parameters.get<Real>("nutrient_ic");
-  const double hyp_th            = all_parameters.get<Real>("hypoxic_thrs");
   const double prol_int          = all_parameters.get<Real>("prol_intes");
-  //const Real tau_A               = all_parameters.get<Real>("apop_time");
   double confluence_live = 0.0;
   double confluence_dead = 0.0;
-  const double proliferative_ratio = max(prol_int*(nut_ic-hyp_th)/(1.0-hyp_th),0.0);
+  const double proliferative_ratio = prol_int;
   double single_cell_area = M_PI*std::pow(c_radius,2);
   double domain_area = M_PI*std::pow(0.5*domain_diameter,2);
   // ********** Compute live cells confluence minus 1 cell (to round later) **********
@@ -556,7 +782,7 @@ void init_cond_cells(list<Cell>& Cells_local, const Parameters& all_parameters, 
   radius_scale = new_radius_cell/c_radius;
   cell_time = (2.0*pow(radius_scale,2)-1.0)*tau_g1-tau_g1+tau_P;  
   round_confluence = true;
-  while(round_confluence){
+  while(round_confluence && initial_con_dead>0){
     Point pos;
     bool place_cell = true;
     pos(0) = ran.doub()*domain_diameter;
