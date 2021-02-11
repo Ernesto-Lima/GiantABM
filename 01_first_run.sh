@@ -5,8 +5,8 @@ scale=16
 input_file=options.in
 cat << EOF > ${input_file}
 initial_tum = 3
-n_timesteps = 300
-print_inter = 30
+n_timesteps = 1000
+print_inter = 5
 verbose = 1
 print_sa = 1
 domain_diameter = 6384
@@ -44,7 +44,7 @@ parameters_file=parameters.in
 cat << EOF > ${parameters_file}
 alpha_p = 5.9e-02
 alpha_a = 4.1e-04
-live_ic = 0.6
+live_ic = 0.1
 dead_ic = 0.0
 t_death = 10.0
 size_loop = ${loop}

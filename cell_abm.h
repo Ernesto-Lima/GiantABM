@@ -6,7 +6,7 @@ public:
   //********** Cell position **********
   double x, y;
   //********** Cell properties **********
-  double N_radius, C_radius, A_radius, uptake, cal;
+  double N_radius, C_radius, A_radius, uptake, cal, abs_nf;
   double v[2], F[2];
   int time, state, prev_state;
   void set(double X, double Y, double RN, double R, double RA, double Uptake, int Time, int State);

@@ -47,8 +47,7 @@ void update_states(list<Cell> & Cells_local, int time, Ran & ran, EquationSystem
       // Base parameter calculation
       double alfa_p = alfa_p_barra;
       double alfa_a = alfa_a_barra;
-      double max_speed = euclid_norm((*it).v[0], (*it).v[1]);
-	  double prob_mit = exp(-100.0*max_speed)*((1.0-exp(-delta_tt*alfa_p))/2.0);
+	  double prob_mit = exp(-1.0*(*it).abs_nf)*((1.0-exp(-delta_tt*alfa_p))/2.0);
 	  double prob_apo = (1.0-exp(-delta_tt*alfa_a))/2.0;
 	  double rand_num = ran.doub();
 	  
@@ -181,6 +180,7 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
   double iter                    = 0.0;
   const double delta_tt_max      = 60.0;
   double v_max;
+  double nf_max;
   bool move_all = false;
   vector< list <Cell *>> Cell_Bins(total_bins);
   // ********** Loop **********
@@ -197,6 +197,7 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
 	  unsigned int xy = ix+jy*number_bins;
 	  (*it).F[0] = 0.0;
 	  (*it).F[1] = 0.0;
+	  (*it).abs_nf = 0.0;
 	  if(ix<0 || jy<0 ||jy>=number_bins || ix>=number_bins || xy >=total_bins){
         cout << "Error" << endl;
 	    cout << "Cell = ( " << (*it).x << " , " << (*it).y << " ) = ( " << ix << " , " << jy << " ) = " << xy << endl;
@@ -252,6 +253,9 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
 	          (*(*cell_a)).F[1] += (F_cca_i[1] + F_ccr_i[1]);
 	          (*(*cell_b)).F[0] -= (F_cca_i[0] + F_ccr_i[0]);
 	          (*(*cell_b)).F[1] -= (F_cca_i[1] + F_ccr_i[1]);
+	          double abs_nf = euclid_norm(F_cca_i[0] + F_ccr_i[0], F_cca_i[1] + F_ccr_i[1]);
+	          (*(*cell_a)).abs_nf += abs_nf;
+	          (*(*cell_b)).abs_nf += abs_nf;
               cell_b++;
             }
 	      }
@@ -270,11 +274,14 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
 	    F_rct[0] = -c_rct*psi_x;
 	    F_rct[1] = -c_rct*psi_y;
 	    (*(*cell_a)).F[0] += (F_ct[0] + F_rct[0]);
-	    (*(*cell_a)).F[1] += (F_ct[1] + F_rct[1]);  
+	    (*(*cell_a)).F[1] += (F_ct[1] + F_rct[1]); 
+	    double abs_nf = euclid_norm(F_ct[0] + F_rct[0], F_ct[1] + F_rct[1]);
+        (*(*cell_a)).abs_nf += abs_nf;
 	  }
 	}
     // ********** Compute cell speed **********
     v_max  = 0.0;
+    nf_max = 0.0;
     double v_mean = 0.;
     double v_std  = 0.;
     double * speeds = new double [Cells_local.size()];
@@ -283,6 +290,8 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
 	  (*it).v[0] = -0.5*((*it).F[0]);
 	  (*it).v[1] = -0.5*((*it).F[1]);
 	  double max_speed = euclid_norm((*it).v[0], (*it).v[1]);
+	  if((*it).abs_nf >= nf_max)
+	    nf_max = (*it).abs_nf;
 	  if(max_speed >= v_max)
 	    v_max = max_speed;
 	  speeds[k] = max_speed;
@@ -327,23 +336,23 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
 	}
     iter += delta_tt;
   }
-  cout << v_max << endl;
-  if(v_max > 0.4){
+  //cout << nf_max << endl;
+  
+  if(nf_max > 6.0){
     std::list<Cell>::iterator it;
     for(it = Cells_local.begin(); it != Cells_local.end(); it++){
-      if((*it).state == 1 || (*it).state == 2){	    
-	    double max_speed = euclid_norm((*it).v[0], (*it).v[1]);
-	    //cout << "max_speed = " << max_speed << endl; 
-	    if(max_speed >= 0.4 && 0.37 > ran.doub()){
+      if((*it).state == 1 || (*it).state == 2){
+	    if((*it).abs_nf >= 4.5 && 0.05 > ran.doub()){
+	      unsigned int merged_cells = 0;
 	      move_all = true;
-	      cout << "Changed: " << (*it).state << endl;
+	      cout << "Changed state   = " << (*it).state << endl;
 	      (*it).prev_state = (*it).state;
 	      (*it).state = 8;
-	      (*it).time = 2;
+	      (*it).time = 5;
 	      unsigned int ix = floor((*it).x/h_bin);
 	      unsigned int jy = floor((*it).y/h_bin);
-	      unsigned int xy = ix+jy*number_bins;
-	      cout << "Bin:" << xy << endl;
+	      //unsigned int xy = ix+jy*number_bins;
+	      //cout << "Bin:" << xy << endl;
 	      for(int i = -1; i<=1; i++){
   	        for(int j = -1; j<=1; j++){
     	      int nix = ix + i;
@@ -352,9 +361,10 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
 	          if( !(nix<0 || njy<0 ||njy>=int(number_bins) || nix>=int(number_bins) || nxy >=total_bins) ){
 	            std::list<Cell*>::iterator cell_a;
 	            for(cell_a = Cell_Bins[nxy].begin(); cell_a != Cell_Bins[nxy].end(); ++cell_a){
-	              if( ((*(*cell_a)).state == 1 || (*(*cell_a)).state == 2) && ran.doub() > 0.5){
+	              if( ((*(*cell_a)).state == 1 || (*(*cell_a)).state == 2) && 0.2 > ran.doub()){
 	                (*(*cell_a)).prev_state = (*(*cell_a)).state;
 	                (*(*cell_a)).state = 7;
+	                merged_cells++;
 	                //cout << "Cell" << endl;
 	                (*it).C_radius = radius_c(
 	                                          area_c((*(*cell_a)).C_radius)
@@ -369,7 +379,8 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
 	            }
 	          }
 	        }
-	      }	      
+	      }
+	      cout << "Merged cells    = " << merged_cells << endl;
 	      //getchar();
 	    }
 	  }
@@ -382,6 +393,7 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
   }
   if(move_all)
     compute_initial_forces(Cells_local,equation_systems,height, outside_cells,total_tumor);
+  
 }
 
 void compute_initial_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, double height, int& outside_cells, int& total_tumor)
@@ -406,6 +418,9 @@ void compute_initial_forces(list<Cell>& Cells_local, EquationSystems& equation_s
     std::list<Cell>::iterator it;
     it = Cells_local.begin();
     while(it != Cells_local.end()){
+      (*it).F[0] = 0.0;
+	  (*it).F[1] = 0.0;
+	  (*it).abs_nf = 0.0;
 	  unsigned int ix = floor((*it).x/h_bin);
 	  unsigned int jy = floor((*it).y/h_bin);
 	  unsigned int xy = ix+jy*number_bins;
@@ -464,6 +479,9 @@ void compute_initial_forces(list<Cell>& Cells_local, EquationSystems& equation_s
 	          (*(*cell_a)).F[1] += (F_cca_i[1] + F_ccr_i[1]);
 	          (*(*cell_b)).F[0] -= (F_cca_i[0] + F_ccr_i[0]);
 	          (*(*cell_b)).F[1] -= (F_cca_i[1] + F_ccr_i[1]);
+	          double abs_nf = euclid_norm(F_cca_i[0] + F_ccr_i[0], F_cca_i[1] + F_ccr_i[1]);
+	          (*(*cell_a)).abs_nf += abs_nf;
+	          (*(*cell_b)).abs_nf += abs_nf;
               cell_b++;
             }
 	      }
@@ -482,7 +500,9 @@ void compute_initial_forces(list<Cell>& Cells_local, EquationSystems& equation_s
 	    F_rct[0] = -c_rct*psi_x;
 	    F_rct[1] = -c_rct*psi_y;
 	    (*(*cell_a)).F[0] += (F_ct[0] + F_rct[0]);
-	    (*(*cell_a)).F[1] += (F_ct[1] + F_rct[1]);  
+	    (*(*cell_a)).F[1] += (F_ct[1] + F_rct[1]);
+	    double abs_nf = euclid_norm(F_ct[0] + F_rct[0], F_ct[1] + F_rct[1]);
+        (*(*cell_a)).abs_nf += abs_nf;
 	  }
 	}
     // ********** Compute cell speed **********
@@ -528,8 +548,6 @@ void compute_initial_forces(list<Cell>& Cells_local, EquationSystems& equation_s
     while(it != Cells_local.end()){
 	  (*it).x += delta_tt * (*it).v[0];
 	  (*it).y += delta_tt * (*it).v[1];
-	  (*it).F[0] = 0.0;
-	  (*it).F[1] = 0.0;
 	  double dist = distance((*it), height/2.0, height/2.0);
 	  if(dist >= height/2.0){
 	    it = Cells_local.erase(it);
@@ -944,6 +962,7 @@ void Cell::set(double X,double Y,double RN,double R,double RA,double Uptake, int
   uptake = Uptake;
   time = Time;
   state = State;
+  abs_nf = 0.0;
   v[0] = 0.0;
   v[1] = 0.0;
   F[0] = 0.0;
