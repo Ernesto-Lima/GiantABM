@@ -47,7 +47,7 @@ void update_states(list<Cell> & Cells_local, int time, Ran & ran, EquationSystem
       // Base parameter calculation
       double alfa_p = alfa_p_barra;
       double alfa_a = alfa_a_barra;
-	  double prob_mit = exp(-1.0*(*it).abs_nf)*((1.0-exp(-delta_tt*alfa_p))/2.0);
+	  double prob_mit = (1.0-exp(-delta_tt*alfa_p*exp(-1.0*(*it).abs_nf)))/2.0;
 	  double prob_apo = (1.0-exp(-delta_tt*alfa_a))/2.0;
 	  double rand_num = ran.doub();
 	  
@@ -253,6 +253,13 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
 	          (*(*cell_a)).F[1] += (F_cca_i[1] + F_ccr_i[1]);
 	          (*(*cell_b)).F[0] -= (F_cca_i[0] + F_ccr_i[0]);
 	          (*(*cell_b)).F[1] -= (F_cca_i[1] + F_ccr_i[1]);
+	          /*
+	          double abs_nf = euclid_norm(F_ccr_i[0],F_ccr_i[1]);
+	          if(euclid_norm(F_cca_i[0], F_cca_i[1])<abs_nf){
+	            (*(*cell_a)).abs_nf += abs_nf;
+  	            (*(*cell_b)).abs_nf += abs_nf;
+	          }
+	          */
 	          double abs_nf = euclid_norm(F_cca_i[0] + F_ccr_i[0], F_cca_i[1] + F_ccr_i[1]);
 	          (*(*cell_a)).abs_nf += abs_nf;
 	          (*(*cell_b)).abs_nf += abs_nf;
@@ -275,6 +282,11 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
 	    F_rct[1] = -c_rct*psi_y;
 	    (*(*cell_a)).F[0] += (F_ct[0] + F_rct[0]);
 	    (*(*cell_a)).F[1] += (F_ct[1] + F_rct[1]); 
+	    /*
+	    double abs_nf = euclid_norm(F_rct[0],F_rct[1]);
+        if(euclid_norm(F_ct[0], F_ct[1])<abs_nf)
+          (*(*cell_a)).abs_nf += abs_nf;
+	    */
 	    double abs_nf = euclid_norm(F_ct[0] + F_rct[0], F_ct[1] + F_rct[1]);
         (*(*cell_a)).abs_nf += abs_nf;
 	  }
@@ -338,11 +350,11 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
   }
   //cout << nf_max << endl;
   
-  if(nf_max > 6.0){
+  if(nf_max > 40.5){
     std::list<Cell>::iterator it;
     for(it = Cells_local.begin(); it != Cells_local.end(); it++){
       if((*it).state == 1 || (*it).state == 2){
-	    if((*it).abs_nf >= 4.5 && 0.05 > ran.doub()){
+	    if((*it).abs_nf >= 4.0 && 0.05 > ran.doub()){
 	      unsigned int merged_cells = 0;
 	      move_all = true;
 	      cout << "Changed state   = " << (*it).state << endl;
@@ -479,6 +491,13 @@ void compute_initial_forces(list<Cell>& Cells_local, EquationSystems& equation_s
 	          (*(*cell_a)).F[1] += (F_cca_i[1] + F_ccr_i[1]);
 	          (*(*cell_b)).F[0] -= (F_cca_i[0] + F_ccr_i[0]);
 	          (*(*cell_b)).F[1] -= (F_cca_i[1] + F_ccr_i[1]);
+	          /*
+	          double abs_nf = euclid_norm(F_ccr_i[0],F_ccr_i[1]);
+	          if(euclid_norm(F_cca_i[0], F_cca_i[1])<abs_nf){
+	            (*(*cell_a)).abs_nf += abs_nf;
+  	            (*(*cell_b)).abs_nf += abs_nf;
+	          }
+	          */
 	          double abs_nf = euclid_norm(F_cca_i[0] + F_ccr_i[0], F_cca_i[1] + F_ccr_i[1]);
 	          (*(*cell_a)).abs_nf += abs_nf;
 	          (*(*cell_b)).abs_nf += abs_nf;
@@ -501,6 +520,11 @@ void compute_initial_forces(list<Cell>& Cells_local, EquationSystems& equation_s
 	    F_rct[1] = -c_rct*psi_y;
 	    (*(*cell_a)).F[0] += (F_ct[0] + F_rct[0]);
 	    (*(*cell_a)).F[1] += (F_ct[1] + F_rct[1]);
+	    /*
+	    double abs_nf = euclid_norm(F_rct[0],F_rct[1]);
+        if(euclid_norm(F_ct[0], F_ct[1])<abs_nf)
+          (*(*cell_a)).abs_nf += abs_nf;
+	    */
 	    double abs_nf = euclid_norm(F_ct[0] + F_rct[0], F_ct[1] + F_rct[1]);
         (*(*cell_a)).abs_nf += abs_nf;
 	  }
