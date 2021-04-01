@@ -43,3 +43,4 @@
 .depend
 *.csv
 *.cmd
+.ipynb_checkpoints/
