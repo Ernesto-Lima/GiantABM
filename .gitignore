@@ -41,6 +41,5 @@
 *.py
 *.avi
 .depend
-*.csv
 *.cmd
 .ipynb_checkpoints/
