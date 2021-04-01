@@ -1,12 +1,13 @@
 #!/bin/bash
 rm *# *~ &> /dev/null
+cd Forward_Model
 scale=16
 #################### Create Options File ######################
 input_file=options.in
 cat << EOF > ${input_file}
 initial_tum = 3
-n_timesteps = 1000
-print_inter = 1000
+n_timesteps = 160
+print_inter = 20
 verbose = 1
 print_sa = 1
 domain_diameter = 6384
@@ -28,7 +29,7 @@ python_file=mean_std.py
 cat << EOF > ${python_file}
 import sys
 import pandas as pd
-data = pd.read_csv('sbl.csv',header=None,delimiter=' ')
+data = pd.read_csv('sbl.txt',header=None,delimiter=' ')
 orig_stdout = sys.stdout
 f = open('out_py.txt', 'w')
 sys.stdout = f
@@ -52,11 +53,11 @@ EOF
 #vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 #--------------- Run the model --------------------
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-FILE=sbl.csv
+FILE=sbl.txt
 if [ -f "$FILE" ]; then
-    cp $FILE tmp.csv
+    cp $FILE tmp.txt
     make run
-    cat tmp.csv >> sbl.csv
+    cat tmp.txt >> sbl.txt
 else 
     make run
 fi
@@ -66,8 +67,9 @@ echo $number
 pvpython mean_std.py
 lend=$(wc -l < out_py.txt | awk '{printf "%d\n",$1/2}')
 echo 
-sed -n -e "1,${lend}p" out_py.txt > live_${number}.dat
+sed -n -e "1,${lend}p" out_py.txt > live_${number}.txt
 let lbgn=lend+1
 lend=$(wc -l < out_py.txt | awk '{printf "%d\n",$1+0}')
-sed -n -e "${lbgn},${lend}p" out_py.txt > dead_${number}.dat
-#rm *# *~ tmp.csv out_py.txt &> /dev/null
+sed -n -e "${lbgn},${lend}p" out_py.txt > dead_${number}.txt
+rm *# *~ tmp.txt out_py.txt &> /dev/null
+cd ..

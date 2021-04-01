@@ -27,7 +27,7 @@ int main(int argc, char** argv){
       seeds[i] = 27;//rand();
     ofstream out_file;
     out_file.precision(16);
-    out_file.open("sbl.csv");
+    out_file.open("sbl.txt");
     for(unsigned int j=0;j<size;j++){
       cout << "Seed number = " << j << endl;
       std::vector<double> liveConfModel;

@@ -1,4 +1,5 @@
 #!/bin/bash
+cd Forward_Model
 rm *# *~ merged*.pdf &> /dev/null
 #vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 #--------------- Plotting details -----------------
@@ -9,7 +10,7 @@ font=23
 #vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 #--------------- Plotting every scenario ----------
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-for file in dead*.dat; do
+for file in dead*.txt; do
     samples=$(echo ${file} | cut -d_ -f2 | cut -d. -f1)
     std=$(tail ${file} -n1 | awk '{printf $2}')
     name=evol_${samples}
@@ -34,10 +35,10 @@ for file in dead*.dat; do
     if [ ${std} = 'nan' ]
     then
         #echo -n "'${file}' u (\$0*3):1 axis x1y1 t'Dead' with p pt 7 ps 0.3 lc 'red'," | tee -a figura.cmd &> /dev/null
-        echo -n "'live_${samples}.dat' u (\$0*3):1 axis x1y1 t'' with p pt 7 ps 0.3 lc 'blue'," | tee -a figura.cmd &> /dev/null
+        echo -n "'live_${samples}.txt' u (\$0*3):1 axis x1y1 t'' with p pt 7 ps 0.3 lc 'blue'," | tee -a figura.cmd &> /dev/null
     else
         #echo -n "'${file}' u (\$0*3):1:2 axis x1y1 t'Dead' with yerrorbars pt 7 ps 0.3 lc 'red'," | tee -a figura.cmd &> /dev/null
-        echo -n "'live_${samples}.dat' u (\$0*3):1:2 axis x1y1 t'' with yerrorbars pt 7 ps 0.3 lc 'blue'," | tee -a figura.cmd &> /dev/null
+        echo -n "'live_${samples}.txt' u (\$0*3):1:2 axis x1y1 t'' with yerrorbars pt 7 ps 0.3 lc 'blue'," | tee -a figura.cmd &> /dev/null
     fi
     gnuplot "figura.cmd"
     pdfcrop ${name}.pdf ${name}t.pdf &> /dev/null
@@ -45,3 +46,4 @@ for file in dead*.dat; do
 done
 pdftk evol_*.pdf cat output merged_samples.pdf
 rm evol_*.pdf figura.cmd &> /dev/null
+cd ..

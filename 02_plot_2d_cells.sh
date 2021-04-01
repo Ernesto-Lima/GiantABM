@@ -1,4 +1,5 @@
 #!/bin/bash
+cd Forward_Model
 rm *# *~ circle_cell.m &> /dev/null
 #vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 #--------------- Generate circle function ---------
@@ -110,3 +111,4 @@ done
 echo "close(v)" >> matlab_figures.m
 echo "exit" >> matlab_figures.m
 matlab -nodesktop -nosplash -r "matlab_figures"
+cd ..

@@ -1,4 +1,5 @@
 #!/bin/bash
+cd Forward_Model
 rm *# *~ merged*.pdf &> /dev/null
 #vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 #--------------- Plotting details -----------------
@@ -88,3 +89,4 @@ for file in cells_data*.txt; do
     pdfcrop ${name}.pdf ${name}t.pdf &> /dev/null
     mv ${name}t.pdf ${name}.pdf
 done
+cd ..

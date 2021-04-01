@@ -59,7 +59,7 @@ clean: dust
 	@rm -rf *.o
 
 distclean: clean
-	@rm -rf $(notdir $(target)) .libs .depend
+	@rm -rf $(notdir $(target)) .libs .depend *.m *.in mean_std.py *.pdf *.avi
 	
 cleanall: distclean
 	@rm -rf *.pdf dead_*.dat live*.dat
