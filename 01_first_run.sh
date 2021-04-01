@@ -42,7 +42,7 @@ loop=1
 echo "Realizations to add = ${loop}"
 parameters_file=parameters.in
 cat << EOF > ${parameters_file}
-alpha_p = 5.9e-02
+alpha_p = 5.0e-01
 alpha_a = 4.1e-04
 live_ic = 0.1
 dead_ic = 0.0

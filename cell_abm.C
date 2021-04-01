@@ -706,6 +706,47 @@ void init_cond_cells(list<Cell>& Cells_local, const Parameters& all_parameters, 
   const double proliferative_ratio = prol_int;
   double single_cell_area = M_PI*std::pow(c_radius,2);
   double domain_area = M_PI*std::pow(0.5*domain_diameter,2);
+  bool ic_by_confluence = false;
+  bool ic_by_cell_number = true;
+  if(ic_by_cell_number){
+    unsigned int total_cells = 0;
+    while(total_cells < 7){
+      Point pos;
+      bool place_cell = true;
+      pos(0) = ran.doub()*domain_diameter;
+      pos(1) = ran.doub()*domain_diameter;
+      Point center;
+      center(0) = 0.5*domain_diameter;
+      center(1) = 0.5*domain_diameter;
+      if(point_distance(pos, center) > 0.5*domain_diameter)
+        place_cell = false;
+      else{
+        std::list<Cell>::iterator it;
+        for(it = Cells_local.begin(); it != Cells_local.end(); it++){
+          Point cell;
+          cell(0) = (*it).x;
+          cell(1) = (*it).y;
+          if(point_distance(pos, cell) < 2.*n_radius){
+            place_cell = false;
+            break;
+          }
+        }
+      }
+      if(place_cell){
+        total_cells++;
+        Cell a;
+        a.set(pos(0), pos(1), n_radius, c_radius, a_radius, lambda_cell, 0, 1);
+        if(ran.doub() < proliferative_ratio){
+	      a.time = -ran.doub()*(tau_P-tau_g1);
+	      a.prev_state = 1;
+	      a.state = 2;
+	    }
+        Cells_local.push_back(a);
+        confluence_live += single_cell_area/domain_area;
+      }
+    }
+  }
+  else if(ic_by_confluence){
   // ********** Compute live cells confluence minus 1 cell (to round later) **********
   const double almost_live_confluence = initial_con_live-single_cell_area/domain_area;
   while(confluence_live < almost_live_confluence){
@@ -861,6 +902,7 @@ void init_cond_cells(list<Cell>& Cells_local, const Parameters& all_parameters, 
       confluence_dead += (M_PI*std::pow(radius_scale*c_radius,2))/domain_area;
 	  round_confluence = false;
     }
+  }
   }
 }
 
