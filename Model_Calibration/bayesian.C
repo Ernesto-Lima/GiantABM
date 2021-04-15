@@ -55,7 +55,7 @@ int main(int argc, char* argv[]){
     paramMins[0] = 0.0;   // Alpha_P
     paramMaxs[0] = 1.0;
     paramMins[1] = 0.0;   // Sigma_H
-    paramMaxs[1] = 1.0;
+    paramMaxs[1] = 50.0;
     QUESO::BoxSubset<> paramDomain("param_",
                                    paramSpace,
                                    paramMins,
@@ -99,15 +99,15 @@ int main(int argc, char* argv[]){
     // set the 'pdf' and the 'realizer' of the posterior RV
     //------------------------------------------------------
     
-    QUESO::GslVector paramInitials(paramSpace.zeroVector());
-    priorRv.realizer().realization(paramInitials);
+    //QUESO::GslVector paramInitials(paramSpace.zeroVector());
+    //priorRv.realizer().realization(paramInitials);
 
     //QUESO::GslMatrix proposalCovMatrix(paramSpace.zeroVector());
     //proposalCovMatrix(0,0) = std::pow(std::abs(paramInitials[0]) / 20.0, 2.0);
 
-    ip.solveWithBayesMetropolisHastings(NULL, paramInitials);
+    //ip.solveWithBayesMetropolisHastings(NULL, paramInitials);
     
-    //ip.solveWithBayesMLSampling();
+    ip.solveWithBayesMLSampling();
   }
   MPI_Finalize();
   return 0;

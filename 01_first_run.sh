@@ -1,13 +1,14 @@
 #!/bin/bash
 rm *# *~ &> /dev/null
 cd Forward_Model
+make distclean
 scale=16
 #################### Create Options File ######################
 input_file=options.in
 cat << EOF > ${input_file}
 initial_tum = 3
-n_timesteps = 160
-print_inter = 20
+n_timesteps = 1400
+print_inter = 100
 verbose = 1
 print_sa = 1
 domain_diameter = 6384
@@ -43,7 +44,7 @@ loop=1
 echo "Realizations to add = ${loop}"
 parameters_file=parameters.in
 cat << EOF > ${parameters_file}
-alpha_p = 5.0e-01
+alpha_p = 0.195
 alpha_a = 4.1e-04
 live_ic = 0.1
 dead_ic = 0.0

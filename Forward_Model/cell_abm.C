@@ -350,11 +350,11 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
   }
   //cout << nf_max << endl;
   
-  if(nf_max > 40.5){
+  if(nf_max > 5.5){
     std::list<Cell>::iterator it;
     for(it = Cells_local.begin(); it != Cells_local.end(); it++){
       if((*it).state == 1 || (*it).state == 2){
-	    if((*it).abs_nf >= 4.0 && 0.05 > ran.doub()){
+	    if((*it).abs_nf >= 4.5 && 0.05 > ran.doub()){
 	      unsigned int merged_cells = 0;
 	      move_all = true;
 	      cout << "Changed state   = " << (*it).state << endl;
@@ -920,7 +920,8 @@ void save_cells(const list<Cell>& Cells_local, double domain_diameter, string s,
     //==******** Creating a string with the correct name ********==//
     const char *c = s.c_str();
     char n[100],name[200];
-    sprintf(n,"%d_%05d.m",file_number,t);
+    //sprintf(n,"%d_%05d.m",file_number,t);
+    sprintf(n,"%d_%05d.txt",file_number,t);
     strcpy(name,c);
     strcat(name,n);
     stringstream ss;
@@ -931,8 +932,9 @@ void save_cells(const list<Cell>& Cells_local, double domain_diameter, string s,
     //==******** Saving the data ********==//
     ofstream out_file;
     out_file.open (name_s);
-    out_file << "cells = zeros(" << Cells_local.size()+1 << "," << 4 << ");" <<endl;
-    out_file << "cells = [" << -1 << " " << domain_diameter*0.5 << " " << domain_diameter*0.5 << " " << domain_diameter*0.5 << endl;
+    //out_file << "cells = zeros(" << Cells_local.size()+1 << "," << 4 << ");" <<endl;
+    //out_file << "cells = [" << -1 << " " << domain_diameter*0.5 << " " << domain_diameter*0.5 << " " << domain_diameter*0.5 << endl;
+    out_file << -1 << " " << domain_diameter*0.5 << " " << domain_diameter*0.5 << " " << domain_diameter*0.5 << endl;
   
     // Save all cells
     std::list<Cell>::const_iterator it;
@@ -941,7 +943,7 @@ void save_cells(const list<Cell>& Cells_local, double domain_diameter, string s,
       out_file << (*it).state << " " << (*it).x << " " << (*it).y << " " << (*it).C_radius << endl;
     }
   
-    out_file << "];";
+    //out_file << "];";
     out_file.close();
   }
   else{
