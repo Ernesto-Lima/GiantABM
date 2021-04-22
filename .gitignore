@@ -42,3 +42,5 @@
 .depend
 *.cmd
 .ipynb_checkpoints/
+Model_Calibration/models_ode_sifp
+Results/

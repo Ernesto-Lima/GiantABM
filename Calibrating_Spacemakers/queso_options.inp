@@ -1,0 +1,56 @@
+###############################################
+# UQ Environment
+###############################################
+env_numSubEnvironments = 1
+env_displayVerbosity   = 1
+env_subDisplayFileName = outputData/display
+env_subDisplayAllowAll = 1
+env_displayVerbosity   = 1
+env_seed               = -1
+####################################################################
+# Statistical inverse problem (ip)
+####################################################################
+ip_ml_default_rawChain_size               = 300
+#ip_ml_default_rawChain_dataOutputFileName = outputData/rawChain_ml_inter
+ip_ml_last_rawChain_dataOutputFileName    = outputData/rawChain_ml
+ip_ml_last_rawChain_size                  = 3000
+ip_ml_default_minEffectiveSizeRatio = 0.49
+ip_ml_default_maxEffectiveSizeRatio = 0.51
+ip_ml_default_minRejectionRate      = 0.24
+ip_ml_default_maxRejectionRate      = 0.4
+ip_ml_default_putOutOfBoundsInChain = 0
+
+###############################################
+# Statistical inverse problem (ip)
+###############################################
+ip_computeSolution      = 1
+ip_dataOutputFileName   = outputData/sip_gravity
+
+###############################################
+# Information for Metropolis-Hastings algorithm
+###############################################
+ip_mh_dataOutputFileName   = outputData/sip_spacemaker
+ip_mh_dataOutputAllowedSet = 0 1
+
+ip_mh_rawChain_dataInputFileName    = . 
+ip_mh_rawChain_size                 = 2000
+ip_mh_rawChain_generateExtra        = 0
+ip_mh_rawChain_displayPeriod        = 1
+ip_mh_rawChain_measureRunTimes      = 1
+ip_mh_rawChain_dataOutputFileName   = outputData/rawChain_mh
+ip_mh_rawChain_dataOutputAllowedSet = 0 1 2 3 4 5 6 7
+
+ip_mh_displayCandidates             = 0
+ip_mh_putOutOfBoundsInChain         = 0 
+ip_mh_dr_maxNumExtraStages          = 3
+ip_mh_dr_listOfScalesForExtraStages = 5. 10. 20.
+ip_mh_am_initialNonAdaptInterval    = 0 
+ip_mh_am_adaptInterval              = 100
+ip_mh_am_eta                        = 2.88  	#(2.4^2)/d, d is the dimension of the problem
+ip_mh_am_epsilon                    = 1.e-5
+
+ip_mh_filteredChain_generate             = 1
+ip_mh_filteredChain_discardedPortion     = 0.
+ip_mh_filteredChain_lag                  = 20
+ip_mh_filteredChain_dataOutputFileName   = outputData/filteredChain_mh
+ip_mh_filteredChain_dataOutputAllowedSet = 0 1
