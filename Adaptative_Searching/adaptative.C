@@ -26,8 +26,11 @@ private:
   void grid_refine_mle();
   void grid_refine();
   std::vector< std::vector<double> > get_unique(std::vector< std::vector<double> > full_vec);
-public:
   Parameter_Space();
+public:
+  int world_rank;
+  int world_size;
+  Parameter_Space(int argc, char* argv[]);
   unsigned int get_dim();
   unsigned int get_maxlvl();
   void set_maxlvl(int lvl);
@@ -40,6 +43,7 @@ public:
   void grid_init();
   void grid_save(std::string file_name);
   void solve(std::function<double(const std::vector<double> paramValues, const void *functionDataPtr)> func, const void* functionDataPtr);
+  void solve_serial(std::function<double(const std::vector<double> paramValues, const void *functionDataPtr)> func, const void* functionDataPtr);
   void solve_mle(std::function<double(const std::vector<double> paramValues, const void *functionDataPtr)> func, const void* functionDataPtr);
   std::vector<double> get_mle();
 };
@@ -258,6 +262,96 @@ void Parameter_Space::solve(std::function<double(const std::vector<double> param
     for(unsigned int l = 0; l < level_max-1; l++){
       const unsigned int g = GRID.size()-1;
       bool refine = false;
+      int remainder = GRID[g].size() % world_size;
+      int local_counts[world_size], offsets[world_size];
+      int sum = 0;
+      for (int i = 0; i < world_size; i++) {
+        local_counts[i] = GRID[g].size() / world_size;
+        if (remainder > 0) {
+          local_counts[i] += 1;
+          remainder--;
+        }
+        offsets[i] = sum;
+        sum += local_counts[i];
+      }
+      int localArray[local_counts[world_rank]];
+      int A[GRID[g].size()];
+      double R[GRID[g].size()];
+      double localLogLike[local_counts[world_rank]];
+      if (!world_rank) {
+        for (int i = 0; i < GRID[g].size(); i++) {
+          A[i] = i;
+        }
+      }
+      MPI_Scatterv(A, local_counts, offsets, MPI_INT, localArray, local_counts[world_rank], MPI_INT, 0, MPI_COMM_WORLD);
+      for (unsigned int r = 0; r<local_counts[world_rank]; r++){
+        unsigned int l = localArray[r];
+        if(parameters.size()==GRID[g][l].size()){
+          double value;
+          value = func(GRID[g][l],functionDataPtr);
+          refine = true;
+          localLogLike[r] = value;
+        }
+        else{
+          localLogLike[r] = GRID[g][l][GRID[g][l].size()-1];
+        }
+      }
+      MPI_Allgatherv(localLogLike, local_counts[world_rank], MPI_DOUBLE, R, local_counts, offsets, MPI_DOUBLE, MPI_COMM_WORLD);
+      for(unsigned int l=0; l<GRID[g].size(); l++)
+        if(parameters.size()==GRID[g][l].size())
+          GRID[g][l].push_back(R[l]);
+      if(refine)
+        grid_refine();
+    }
+    const unsigned int g = GRID.size()-1;
+    int remainder = GRID[g].size() % world_size;
+    int local_counts[world_size], offsets[world_size];
+    int sum = 0;
+    for (int i = 0; i < world_size; i++) {
+      local_counts[i] = GRID[g].size() / world_size;
+      if (remainder > 0) {
+        local_counts[i] += 1;
+        remainder--;
+      }
+      offsets[i] = sum;
+      sum += local_counts[i];
+    }
+    int localArray[local_counts[world_rank]];
+    int A[GRID[g].size()];
+    double R[GRID[g].size()];
+    double localLogLike[local_counts[world_rank]];
+    if (!world_rank) {
+      for (int i = 0; i < GRID[g].size(); i++) {
+        A[i] = i;
+      }
+    }
+    MPI_Scatterv(A, local_counts, offsets, MPI_INT, localArray, local_counts[world_rank], MPI_INT, 0, MPI_COMM_WORLD);
+    for (unsigned int r = 0; r<local_counts[world_rank]; r++){
+      unsigned int l = localArray[r];
+      if(parameters.size()==GRID[g][l].size()){
+        double value;
+        value = func(GRID[g][l],functionDataPtr);
+        localLogLike[r] = value;
+      }
+      else{
+        localLogLike[r] = GRID[g][l][GRID[g][l].size()-1];
+      }
+    }
+    MPI_Allgatherv(localLogLike, local_counts[world_rank], MPI_DOUBLE, R, local_counts, offsets, MPI_DOUBLE, MPI_COMM_WORLD);
+    for(unsigned int l=0; l<GRID[g].size(); l++)
+      if(parameters.size()==GRID[g][l].size())
+        GRID[g][l].push_back(R[l]);
+  }
+  else{
+    std::cout << "ERROR: You must initialize the grid before solving the problem.\n";
+  }
+}
+
+void Parameter_Space::solve_serial(std::function<double(const std::vector<double> paramValues, const void *functionDataPtr)> func, const void* functionDataPtr){
+  if(GRID.size()!=0){
+    for(unsigned int l = 0; l < level_max-1; l++){
+      const unsigned int g = GRID.size()-1;
+      bool refine = false;
       for(unsigned int l=0; l<GRID[g].size(); l++){
         if(parameters.size()==GRID[g][l].size()){
           double value;
@@ -397,11 +491,13 @@ void Parameter_Space::grid_save(std::string file_name){
 }
 
 void Parameter_Space::print_parameters(){
-  std::cout << "---------------------------------------------\n";
-  std::cout << "\t Parameters being calibrated\n";
-  for (unsigned i = 0; i<parameters.size(); i++)
-    std::cout << parameters[i].name << " = (" << parameters[i].low << "|" << parameters[i].max << ")\n";
-  std::cout << "---------------------------------------------\n";
+  if(!world_rank){
+    std::cout << "---------------------------------------------\n";
+    std::cout << "\t Parameters being calibrated\n";
+    for (unsigned i = 0; i<parameters.size(); i++)
+      std::cout << parameters[i].name << " = (" << parameters[i].low << "|" << parameters[i].max << ")\n";
+    std::cout << "---------------------------------------------\n";
+  }
 }
 
 void Parameter_Space::add_parameter(std::string name,double min,double max){
@@ -472,6 +568,19 @@ Parameter_Space::Parameter_Space(){
   number_of_intervals = 4;
 }
 
+Parameter_Space::Parameter_Space(int argc, char* argv[]){
+  level_max = 3;
+  number_of_intervals = 4;
+  int flag_i;
+  MPI_Initialized(&flag_i);
+  if ( ! flag_i)
+    MPI_Init(&argc,&argv);
+  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+  if(!world_rank)
+    std::cout << std::endl;
+}
+
 unsigned int Parameter_Space::get_dim(){
   return parameters.size();
 }
@@ -494,35 +603,46 @@ inline void read_full_data(std::vector< std::vector< std::vector<double> > >& v_
                            const std::string data_file);
                            
 int main(int argc, char* argv[]){
-  Parameter_Space mesh;
-  mesh.set_maxlvl(20);
-  mesh.set_inter(11);
-  cout << "Number of parameters......." << mesh.get_dim() << endl;
-  cout << "Number of intervals........" << mesh.get_inter() << endl;
-  cout << "Maximum number of levels..." << mesh.get_maxlvl() << endl;
-  mesh.add_parameter("proliferation rate",0,1);
-  mesh.add_parameter("standard deviation",0.01,50);
-  cout << "Number of parameters......." << mesh.get_dim() << endl;
-  mesh.print_parameters();
-  mesh.grid_init();
-  mesh.grid_save("grid_model_calibration");
-  
-  LibMeshInit init (argc, argv);
-  likelihoodRoutine_DataType likelihoodRoutine_Data;
-  likelihoodRoutine_Data.init = &init;
-  read_full_data(likelihoodRoutine_Data.Full_Data,"../Data/small_cells.dat");
-  cout << "Number of datasets........." << likelihoodRoutine_Data.Full_Data.size() << endl;
-  for (unsigned int i = 0; i<likelihoodRoutine_Data.Full_Data.size(); i++)
-    cout << "Number of time points......" << likelihoodRoutine_Data.Full_Data[i][0].size() << endl;
-
-  mesh.solve(&likelihoodRoutine,&likelihoodRoutine_Data);
-  mesh.grid_save("solved_model_calibration");
-  vector<double> mle = mesh.get_mle();
-  std::cout << "MLE: P(" << mle[0];
-  for (unsigned int i = 1; i<mle.size()-1; i++){
-    std::cout << "|" << mle[i];
+  MPI_Init(&argc,&argv);
+  {
+    Parameter_Space mesh(argc,argv);
+    mesh.set_maxlvl(21);
+    mesh.set_inter(11);
+    mesh.add_parameter("proliferation rate",0,1);
+    mesh.add_parameter("standard deviation",0.01,50);
+    if(!mesh.world_rank){
+      cout << "Number of intervals........" << mesh.get_inter() << endl;
+      cout << "Maximum number of levels..." << mesh.get_maxlvl() << endl;
+      cout << "Number of parameters......." << mesh.get_dim() << endl;
+    }
+    mesh.print_parameters();
+    mesh.grid_init();
+    mesh.grid_save("grid_model_calibration");
+    //###################################################################
+    //--------------- Initializing libmesh and likelihood ---------------
+    LibMeshInit init (argc, argv, MPI_COMM_SELF);
+    likelihoodRoutine_DataType likelihoodRoutine_Data;
+    likelihoodRoutine_Data.init = &init;
+    read_full_data(likelihoodRoutine_Data.Full_Data,"../Data/small_cells.dat");
+    if(!mesh.world_rank){
+      cout << "Number of datasets........." << likelihoodRoutine_Data.Full_Data.size() << endl;
+      for (unsigned int i = 0; i<likelihoodRoutine_Data.Full_Data.size(); i++)
+        cout << "Number of time points......" << likelihoodRoutine_Data.Full_Data[i][0].size() << endl;
+    }
+    //###################################################################
+    mesh.solve(&likelihoodRoutine,&likelihoodRoutine_Data); // real 0m25.792s - MLE: P(0.195883|11.3736) = -138.985
+    //mesh.solve_serial(&likelihoodRoutine,&likelihoodRoutine_Data); // real 1m29.590s - MLE: P(0.195883|11.3736) = -138.985
+    if(!mesh.world_rank){
+      mesh.grid_save("solved_model_calibration");
+      vector<double> mle = mesh.get_mle();
+      std::cout << "MLE: P(" << mle[0];
+      for (unsigned int i = 1; i<mle.size()-1; i++){
+        std::cout << "|" << mle[i];
+      }
+      std::cout << ") = " << mle[mle.size()-1];
+    }
   }
-  std::cout << ") = " << mle[mle.size()-1];
+  MPI_Finalize();
   return 0;
 }
 

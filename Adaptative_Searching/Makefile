@@ -9,6 +9,8 @@ include $(LIBMESH_DIR)/Make.common
 
 target     := ./forward_model
 
+LIBMESH_RUN = mpiexec -np 4
+
 
 ###############################################################################
 # File management.  This is where the source, header, and object files are
