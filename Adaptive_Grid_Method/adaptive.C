@@ -9,7 +9,7 @@
 #include <string>
 #include "main_abm_oxy.h"
 #include "general_libraries.h"
-#include "libapg.h"
+#include "libpagm.h"
 
 struct likelihoodRoutine_DataType{
   std::vector< std::vector< std::vector<double> > > Full_Data;
@@ -28,7 +28,7 @@ int main(int argc, char* argv[]){
   MPI_Init(&argc,&argv);
   {
     Parameter_Space mesh(argc,argv);
-    mesh.set_maxlvl(21);
+    mesh.set_maxlvl(12);
     mesh.set_inter(11);
     mesh.add_parameter("proliferation rate",0,1);
     mesh.add_parameter("standard deviation",0.01,50);

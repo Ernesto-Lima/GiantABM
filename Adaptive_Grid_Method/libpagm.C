@@ -7,7 +7,7 @@
 #include <functional>
 #include <fstream>
 #include <string>
-#include "libapg.h"
+#include "libpagm.h"
 #include <mpi.h>
 
 std::vector< std::vector<double> > Parameter_Space::get_unique(std::vector< std::vector<double> > full_vec){
@@ -176,6 +176,17 @@ std::vector<double> Parameter_Space::get_mle(){
           }        
         }
       }
+      //###
+      if(!world_rank){
+        std::cout << "MLE: P(" << mle[0];
+        for (unsigned int i = 1; i<mle.size()-1; i++){
+          std::cout << "|" << mle[i];
+        }
+        std::cout << ") = " << mle[mle.size()-1] << std::endl;
+      }
+      
+      
+      
     }
     if(first){
       std::vector<double> tmp(1,0);

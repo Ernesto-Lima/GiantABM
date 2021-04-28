@@ -7,7 +7,7 @@ scale=16
 input_file=options.in
 cat << EOF > ${input_file}
 initial_tum = 3
-n_timesteps = 1400
+n_timesteps = 1313
 print_inter = 100
 verbose = 1
 print_sa = 1
@@ -57,10 +57,12 @@ EOF
 FILE=sbl.txt
 if [ -f "$FILE" ]; then
     cp $FILE tmp.txt
-    make run
+    make
+    time make run
     cat tmp.txt >> sbl.txt
-else 
-    make run
+else
+    make
+    time make run
 fi
 #################### Post-Process the Results ###################
 number=$(more $FILE | wc -l | awk '{printf "%05d\n",$1+0}')
