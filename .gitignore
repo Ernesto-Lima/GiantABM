@@ -40,6 +40,8 @@
 *.py
 *.avi
 .depend
+*.jpg
+*.mp4
 *.cmd
 .ipynb_checkpoints/
 Model_Calibration/models_ode_sifp

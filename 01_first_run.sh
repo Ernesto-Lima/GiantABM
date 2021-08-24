@@ -8,7 +8,7 @@ input_file=options.in
 cat << EOF > ${input_file}
 initial_tum = 3
 n_timesteps = 1313
-print_inter = 100
+print_inter = 20
 verbose = 1
 print_sa = 1
 domain_diameter = 6384
