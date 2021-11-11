@@ -47,8 +47,7 @@ void update_states(list<Cell> & Cells_local, int time, Ran & ran, EquationSystem
       // Base parameter calculation
       double alfa_p = alfa_p_barra;
       double alfa_a = alfa_a_barra;
-	  //double prob_mit = (1.0-exp(-delta_tt*alfa_p*exp(-0.5*(*it).abs_nf)))/2.0;
-	  double prob_mit = (1.0-exp(-delta_tt*alfa_p))/2.0;
+	  double prob_mit = (1.0-exp(-delta_tt*alfa_p*exp(-1.0*(*it).abs_nf)))/2.0;
 	  double prob_apo = (1.0-exp(-delta_tt*alfa_a))/2.0;
 	  double rand_num = ran.doub();
 	  
@@ -175,6 +174,8 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
   const double c_hha             = equation_systems.parameters.get<Real>("c_hha");
   const double max_c_radius      = equation_systems.parameters.get<Real>("cell_radius");
   const double action_prop       = equation_systems.parameters.get<Real>("action_prop");
+  const double f_limit           = equation_systems.parameters.get<Real>("f_limit");
+  const int sm_timer             = equation_systems.parameters.get<int>("sm_timer");
   const double h_bin             = 3.0*max_c_radius;
   const unsigned int number_bins = ceil(height/h_bin);
   const unsigned int total_bins  = number_bins*number_bins;
@@ -272,7 +273,7 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
 	    double F_ct[2] = {0.0, 0.0}, F_rct[2] = {0.0, 0.0};
 	    double N_x, N_y; 
 	    double K = (double) 10.0;
-	    double c_ct = 10.0 * K; // 10.0 * K;
+	    double c_ct = 10.0 * K;
 	    double c_rct = 4.88836 * K;
 	    normal(N_x, N_y, (*(*cell_a)).x, (*(*cell_a)).y, height);
 	    potential_adh(phi_x, phi_y, N_x, N_y, (*(*cell_a)).A_radius, n);
@@ -350,17 +351,18 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
     iter += delta_tt;
   }
   //cout << nf_max << endl;
-  if(nf_max > 150.77273){
+  
+  if(nf_max > f_limit){
     std::list<Cell>::iterator it;
     for(it = Cells_local.begin(); it != Cells_local.end(); it++){
       if((*it).state == 1 || (*it).state == 2){
-	    if((*it).abs_nf >= 150.77273 && 0.1 > ran.doub()){
+	    if((*it).abs_nf >= f_limit && 0.05 > ran.doub()){
 	      unsigned int merged_cells = 0;
 	      move_all = true;
-	      cout << "Changed state   = " << (*it).state << endl;
+	      //cout << "Changed state   = " << (*it).state << endl;
 	      (*it).prev_state = (*it).state;
 	      (*it).state = 8;
-	      (*it).time = 43.0511;
+	      (*it).time = sm_timer;
 	      unsigned int ix = floor((*it).x/h_bin);
 	      unsigned int jy = floor((*it).y/h_bin);
 	      //unsigned int xy = ix+jy*number_bins;
@@ -392,7 +394,7 @@ void compute_forces(list<Cell>& Cells_local, EquationSystems& equation_systems, 
 	          }
 	        }
 	      }
-	      cout << "Merged cells    = " << merged_cells << endl;
+	      //cout << "Merged cells    = " << merged_cells << endl;
 	      //getchar();
 	    }
 	  }
@@ -689,28 +691,24 @@ void divide_cell(list<Cell>& Cells_local, std::list<Cell>::iterator &it, Ran& ra
 }
 
 // ********** Set initial conditions in the simulation for number of cells **********
-void init_cond_cells(list<Cell>& Cells_local, const Parameters& all_parameters, Ran& ran)
-{
-  const Real n_radius            = all_parameters.get<Real>("nucleus_radius");
-  const Real c_radius            = all_parameters.get<Real>("cell_radius");
-  const Real a_radius            = all_parameters.get<Real>("action_radius");
-  const Real domain_diameter     = all_parameters.get<Real>("domain_diameter");
-  const Real lambda_cell         = all_parameters.get<Real>("lambda_cell");
-  const Real initial_con_live    = all_parameters.get<Real>("initial_con_live");
-  const Real initial_con_dead    = all_parameters.get<Real>("initial_con_dead");
-  const Real tau_P               = all_parameters.get<Real>("cellc_time");
-  const Real tau_g1              = all_parameters.get<Real>("g1_time");
-  const double prol_int          = all_parameters.get<Real>("prol_intes");
-  double confluence_live = 0.0;
-  double confluence_dead = 0.0;
-  const double proliferative_ratio = prol_int;
-  double single_cell_area = M_PI*std::pow(c_radius,2);
-  double domain_area = M_PI*std::pow(0.5*domain_diameter,2);
-  bool ic_by_confluence = false;
-  bool ic_by_cell_number = true;
-  if(ic_by_cell_number){
+void init_cond_cells(list<Cell>& Cells_local,
+                     const Parameters& all_parameters,
+                     Ran& ran){
+  const Real n_radius             = all_parameters.get<Real>("nucleus_radius");
+  const Real c_radius             = all_parameters.get<Real>("cell_radius");
+  const Real a_radius             = all_parameters.get<Real>("action_radius");
+  const Real domain_diameter      = all_parameters.get<Real>("domain_diameter");
+  const Real lambda_cell          = all_parameters.get<Real>("lambda_cell");
+  const Real initial_con_live     = all_parameters.get<Real>("initial_con_live");
+  const Real initial_con_dead     = all_parameters.get<Real>("initial_con_dead");
+  const Real tau_P                = all_parameters.get<Real>("cellc_time");
+  const Real tau_g1               = all_parameters.get<Real>("g1_time");
+  const double prol_int           = all_parameters.get<Real>("prol_intes");
+  const unsigned int initial_tum  = all_parameters.get<Real>("initial_tum");
+  const unsigned int initial_type = all_parameters.get<Real>("initial_type");
+  if(initial_type){
     unsigned int total_cells = 0;
-    while(total_cells < 7){
+    while(total_cells < initial_tum){
       Point pos;
       bool place_cell = true;
       pos(0) = ran.doub()*domain_diameter;
@@ -736,17 +734,20 @@ void init_cond_cells(list<Cell>& Cells_local, const Parameters& all_parameters, 
         total_cells++;
         Cell a;
         a.set(pos(0), pos(1), n_radius, c_radius, a_radius, lambda_cell, 0, 1);
-        if(ran.doub() < proliferative_ratio){
+        if(ran.doub() < prol_int){
 	      a.time = -ran.doub()*(tau_P-tau_g1);
 	      a.prev_state = 1;
 	      a.state = 2;
 	    }
         Cells_local.push_back(a);
-        confluence_live += single_cell_area/domain_area;
       }
     }
   }
-  else if(ic_by_confluence){
+  else if(initial_type == 0){
+  double confluence_live = 0.0;
+  double confluence_dead = 0.0;
+  double single_cell_area = M_PI*std::pow(c_radius,2);
+  double domain_area = M_PI*std::pow(0.5*domain_diameter,2);
   // ********** Compute live cells confluence minus 1 cell (to round later) **********
   const double almost_live_confluence = initial_con_live-single_cell_area/domain_area;
   while(confluence_live < almost_live_confluence){
@@ -774,7 +775,7 @@ void init_cond_cells(list<Cell>& Cells_local, const Parameters& all_parameters, 
     if(place_cell){
       Cell a;
       a.set(pos(0), pos(1), n_radius, c_radius, a_radius, lambda_cell, 0, 1);
-      if(ran.doub() < proliferative_ratio){
+      if(ran.doub() < prol_int){
 	    a.time = -ran.doub()*(tau_P-tau_g1);
 	    a.prev_state = 1;
 	    a.state = 2;
@@ -920,8 +921,7 @@ void save_cells(const list<Cell>& Cells_local, double domain_diameter, string s,
     //==******** Creating a string with the correct name ********==//
     const char *c = s.c_str();
     char n[100],name[200];
-    //sprintf(n,"%d_%05d.m",file_number,t);
-    sprintf(n,"%d_%05d.txt",file_number,t);
+    sprintf(n,"%d_%05d.m",file_number,t);
     strcpy(name,c);
     strcat(name,n);
     stringstream ss;
@@ -932,9 +932,8 @@ void save_cells(const list<Cell>& Cells_local, double domain_diameter, string s,
     //==******** Saving the data ********==//
     ofstream out_file;
     out_file.open (name_s);
-    //out_file << "cells = zeros(" << Cells_local.size()+1 << "," << 4 << ");" <<endl;
-    //out_file << "cells = [" << -1 << " " << domain_diameter*0.5 << " " << domain_diameter*0.5 << " " << domain_diameter*0.5 << endl;
-    out_file << -1 << " " << domain_diameter*0.5 << " " << domain_diameter*0.5 << " " << domain_diameter*0.5 << endl;
+    out_file << "cells = zeros(" << Cells_local.size()+1 << "," << 4 << ");" <<endl;
+    out_file << "cells = [" << -1 << " " << domain_diameter*0.5 << " " << domain_diameter*0.5 << " " << domain_diameter*0.5 << endl;
   
     // Save all cells
     std::list<Cell>::const_iterator it;
@@ -943,7 +942,7 @@ void save_cells(const list<Cell>& Cells_local, double domain_diameter, string s,
       out_file << (*it).state << " " << (*it).x << " " << (*it).y << " " << (*it).C_radius << endl;
     }
   
-    //out_file << "];";
+    out_file << "];";
     out_file.close();
   }
   else{

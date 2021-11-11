@@ -93,9 +93,11 @@ void main_code(LibMeshInit &init, vector<double>& LIVE_CONFL, vector<double>& DE
   double dead_conf = 0.;
   int num_dead = 0;
   int qtd_c4,qtd_c1,qtd_cp,qtd_cm,qtd_gp;
-  double mean_f,std_f;
+  double mean_f,std_f,min_f,max_f;
   qtd_c4 = qtd_c1 = qtd_cp = qtd_cm = qtd_gp = 0;
   mean_f = std_f = 0.0;
+  min_f = 1e1000;
+  max_f = -100;
   std::list<Cell>::iterator cg;
   for(cg = Cells_local.begin(); cg != Cells_local.end(); cg++){
     if((*cg).state==4){
@@ -105,6 +107,10 @@ void main_code(LibMeshInit &init, vector<double>& LIVE_CONFL, vector<double>& DE
     else if((*cg).state==1){
 	  confluence += std::pow((*cg).C_radius, 2) / std::pow(0.5 * domain_diameter, 2);
 	  mean_f += (*cg).abs_nf;
+	  if(min_f>(*cg).abs_nf)
+	    min_f = (*cg).abs_nf;
+	  if(max_f<(*cg).abs_nf)
+	    max_f = (*cg).abs_nf;
 	  qtd_c1++;
     }
     else if((*cg).state==8){
@@ -140,7 +146,7 @@ void main_code(LibMeshInit &init, vector<double>& LIVE_CONFL, vector<double>& DE
   if(verbose)
     save_cells(Cells_local,domain_diameter,"saida",1,0);
   if(verbose || print_sa)
-    out_data << 0.0 << " " << confluence << " " << dead_conf << " " << qtd_c1 << " " << qtd_cp << " " << qtd_gp << " " << qtd_c4 << " " << qtd_cm << " " << mean_f << " " << std_f << endl;
+    out_data << 0.0 << " " << confluence << " " << dead_conf << " " << qtd_c1 << " " << qtd_cp << " " << qtd_gp << " " << qtd_c4 << " " << qtd_cm << " " << mean_f << " " << std_f << " " << min_f << " " << max_f << endl;
     
   //********** Loop over time **********
   unsigned int t_step = 0;
@@ -158,6 +164,8 @@ void main_code(LibMeshInit &init, vector<double>& LIVE_CONFL, vector<double>& DE
     dead_conf = 0.;
     qtd_c4 = qtd_c1 = qtd_cp = qtd_cm = qtd_gp = 0;
     mean_f = std_f = 0.0;
+    min_f = 1e1000;
+    max_f = -100;
     for(cg = Cells_local.begin(); cg != Cells_local.end(); cg++){
       if((*cg).state==4){
 	    dead_conf += std::pow((*cg).C_radius, 2) / std::pow(0.5 * domain_diameter, 2);
@@ -166,6 +174,10 @@ void main_code(LibMeshInit &init, vector<double>& LIVE_CONFL, vector<double>& DE
       else if((*cg).state==1){
 	    confluence += std::pow((*cg).C_radius, 2) / std::pow(0.5 * domain_diameter, 2);
 	    mean_f += (*cg).abs_nf;
+	    if(min_f>(*cg).abs_nf)
+	      min_f = (*cg).abs_nf;
+	    if(max_f<(*cg).abs_nf)
+	      max_f = (*cg).abs_nf;
   	    qtd_c1++;
       }
       else if((*cg).state==8){
@@ -214,7 +226,7 @@ void main_code(LibMeshInit &init, vector<double>& LIVE_CONFL, vector<double>& DE
 	  */
     }
     if(verbose || print_sa)
-      out_data << t_step << " " << confluence << " " << dead_conf << " " << qtd_c1 << " " << qtd_cp << " " << qtd_gp << " " << qtd_c4 << " " << qtd_cm << " " << mean_f << " " << std_f << endl;
+      out_data << t_step << " " << confluence << " " << dead_conf << " " << qtd_c1 << " " << qtd_cp << " " << qtd_gp << " " << qtd_c4 << " " << qtd_cm << " " << mean_f << " " << std_f << " " << min_f << " " << max_f << endl;
     if(t_step%3==0){
 	  LIVE_CONFL.push_back(confluence);
 	  DEAD_CONFL.push_back(dead_conf);
